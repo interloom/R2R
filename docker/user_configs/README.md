@@ -14,6 +14,22 @@ The application uses the environment variable you set to locate your configurati
 R2R_CONFIG_PATH=/app/user_configs/<config>.toml
 ```
 
+For example, to use Azure Blob file storage in a custom config:
+
+```toml
+[file]
+provider = "azure_blob"
+container_name = "r2r-documents"
+```
+
+Then set the matching environment variable in `r2r.env` or `r2r-full.env`:
+
+```bash
+AZURE_STORAGE_CONNECTION_STRING=...
+```
+
+Like S3, the `azure_blob` backend is an object-store provider, so file export and overview operations work best with explicit document IDs rather than broad Postgres-style filtering.
+
 If you want to use a different filename, update the `R2R_CONFIG_PATH` variable in your environment file to point to your custom file, for example:
 ```
 R2R_CONFIG_PATH=/app/user_configs/my_custom_config.toml

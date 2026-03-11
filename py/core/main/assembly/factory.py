@@ -22,6 +22,7 @@ from core.providers import (
     AnthropicCompletionProvider,
     APSchedulerProvider,
     AsyncSMTPEmailProvider,
+    AzureBlobFileProvider,
     BcryptCryptoConfig,
     BCryptCryptoProvider,
     ClerkAuthProvider,
@@ -134,12 +135,7 @@ class R2RProviderFactory:
     def create_ingestion_provider(
         ingestion_config: IngestionConfig,
         database_provider: PostgresDatabaseProvider,
-        llm_provider: (
-            AnthropicCompletionProvider
-            | LiteLLMCompletionProvider
-            | OpenAICompletionProvider
-            | R2RCompletionProvider
-        ),
+        llm_provider: CompletionProvider,
         ocr_provider: MistralOCRProvider,
         *args,
         **kwargs,
@@ -159,7 +155,7 @@ class R2RProviderFactory:
             return R2RIngestionProvider(
                 config=r2r_ingestion_config,
                 database_provider=database_provider,
-                llm_provider=llm_provider,
+                llm_provider=llm_provider,  # type: ignore[arg-type]
                 ocr_provider=ocr_provider,
             )
         elif config_dict["provider"] in [
@@ -173,7 +169,7 @@ class R2RProviderFactory:
             return UnstructuredIngestionProvider(
                 config=unstructured_ingestion_config,
                 database_provider=database_provider,
-                llm_provider=llm_provider,
+                llm_provider=llm_provider,  # type: ignore[arg-type]
                 ocr_provider=ocr_provider,
             )
         else:
@@ -230,10 +226,15 @@ class R2RProviderFactory:
 
     @staticmethod
     def create_file_provider(
-        config: FileConfig, database_provider=None, *args, **kwargs
+        config: FileConfig,
+        database_provider: Optional[PostgresDatabaseProvider] = None,
+        *args,
+        **kwargs,
     ):
         if config.provider == "postgres":
             from core.providers import PostgresFileProvider
+
+            assert database_provider is not None
 
             return PostgresFileProvider(
                 config=config,
@@ -245,6 +246,8 @@ class R2RProviderFactory:
             from core.providers import S3FileProvider
 
             return S3FileProvider(config)
+        elif config.provider == "azure_blob":
+            return AzureBlobFileProvider(config)
         else:
             raise ValueError(f"File provider {config.provider} not supported")
 

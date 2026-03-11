@@ -15,6 +15,7 @@ from core import parsers
 from core.base import (
     AsyncParser,
     ChunkingStrategy,
+    CompletionProvider,
     Document,
     DocumentChunk,
     DocumentType,
@@ -26,12 +27,6 @@ from core.providers.ocr import MistralOCRProvider
 from core.utils import generate_extraction_id
 
 from ...database import PostgresDatabaseProvider
-from ...llm import (
-    LiteLLMCompletionProvider,
-    OpenAICompletionProvider,
-    R2RCompletionProvider,
-)
-
 logger = logging.getLogger()
 
 
@@ -123,21 +118,13 @@ class UnstructuredIngestionProvider(IngestionProvider):
         self,
         config: UnstructuredIngestionConfig,
         database_provider: PostgresDatabaseProvider,
-        llm_provider: (
-            LiteLLMCompletionProvider
-            | OpenAICompletionProvider
-            | R2RCompletionProvider
-        ),
+        llm_provider: CompletionProvider,
         ocr_provider: MistralOCRProvider,
     ):
         super().__init__(config, database_provider, llm_provider)
         self.config: UnstructuredIngestionConfig = config
         self.database_provider: PostgresDatabaseProvider = database_provider
-        self.llm_provider: (
-            LiteLLMCompletionProvider
-            | OpenAICompletionProvider
-            | R2RCompletionProvider
-        ) = llm_provider
+        self.llm_provider: CompletionProvider = llm_provider
         self.ocr_provider: MistralOCRProvider = ocr_provider
 
         self.client: UnstructuredClient | httpx.AsyncClient

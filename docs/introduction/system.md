@@ -23,7 +23,9 @@ The orchestration layer manages complex workflows and long-running tasks using R
 ### Storage
 The storage layer utilizes:
 - **Postgres with pgvector**: For vector storage, full-text search, and relational data
-- **File Storage**: For document and media file management, either via S3 or Postgres
+- **File Storage**: For document and media file management via Postgres, S3, or Azure Blob Storage
+
+Object-store backends (`s3` and `azure_blob`) are optimized for explicit document IDs when exporting or listing files, while the Postgres-backed file store supports broader filtering semantics.
 
 ### Providers
 Pluggable components that can be customized and swapped:

@@ -7,6 +7,7 @@ from core import parsers
 from core.base import (
     AsyncParser,
     ChunkingStrategy,
+    CompletionProvider,
     Document,
     DocumentChunk,
     DocumentType,
@@ -17,11 +18,6 @@ from core.base import (
     TextSplitter,
 )
 from core.providers.database import PostgresDatabaseProvider
-from core.providers.llm import (
-    LiteLLMCompletionProvider,
-    OpenAICompletionProvider,
-    R2RCompletionProvider,
-)
 from core.providers.ocr import MistralOCRProvider
 from core.utils import generate_extraction_id
 
@@ -98,21 +94,13 @@ class R2RIngestionProvider(IngestionProvider):
         self,
         config: R2RIngestionConfig,
         database_provider: PostgresDatabaseProvider,
-        llm_provider: (
-            LiteLLMCompletionProvider
-            | OpenAICompletionProvider
-            | R2RCompletionProvider
-        ),
+        llm_provider: CompletionProvider,
         ocr_provider: MistralOCRProvider,
     ):
         super().__init__(config, database_provider, llm_provider)
         self.config: R2RIngestionConfig = config
         self.database_provider: PostgresDatabaseProvider = database_provider
-        self.llm_provider: (
-            LiteLLMCompletionProvider
-            | OpenAICompletionProvider
-            | R2RCompletionProvider
-        ) = llm_provider
+        self.llm_provider: CompletionProvider = llm_provider
         self.ocr_provider: MistralOCRProvider = ocr_provider
         self.parsers: dict[DocumentType, AsyncParser] = {}
         self.text_splitter = self._build_text_splitter()

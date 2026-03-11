@@ -200,12 +200,18 @@ concurrent_request_limit = 256
 ################################################################################
 [file]
 provider = "postgres"
+# Object-store providers (`s3`, `azure_blob`) are optimized for explicit
+# document_ids when exporting or listing files. They do not match the broader
+# filtering semantics of the Postgres-backed file store.
 # If using S3
 bucket_name = ""
 endpoint_url = ""
 region_name = ""
 aws_access_key_id = ""
 aws_secret_access_key = ""
+# If using Azure Blob
+container_name = ""
+connection_string = ""
 
 ################################################################################
 # Ingestion Settings (IngestionConfig and nested settings)

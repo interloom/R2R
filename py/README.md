@@ -68,6 +68,20 @@ python -m r2r.serve
 
 For detailed self-hosting instructions, see the [self-hosting docs](https://r2r-docs.sciphi.ai/self-hosting/installation/overview).
 
+## File Storage Backends
+
+R2R can store original documents in Postgres, S3, or Azure Blob Storage.
+
+```toml
+[file]
+provider = "azure_blob"
+container_name = "r2r-documents"
+```
+
+Set `AZURE_STORAGE_CONNECTION_STRING` in the runtime environment to authenticate the Azure Blob provider.
+
+Object-store providers (`s3` and `azure_blob`) are optimized for explicit document IDs when exporting or listing files. If you need broader file filtering semantics, use the Postgres-backed file store.
+
 ## Demo
 https://github.com/user-attachments/assets/173f7a1f-7c0b-4055-b667-e2cdcf70128b
 

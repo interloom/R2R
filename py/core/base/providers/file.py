@@ -25,6 +25,10 @@ class FileConfig(ProviderConfig):
     region_name: Optional[str] = None
     endpoint_url: Optional[str] = None
 
+    # Azure Blob-specific configuration
+    container_name: Optional[str] = None
+    connection_string: Optional[str] = None
+
     @property
     def supported_providers(self) -> list[str]:
         """
@@ -33,6 +37,7 @@ class FileConfig(ProviderConfig):
         return [
             "postgres",
             "s3",
+            "azure_blob",
         ]
 
     def validate_config(self) -> None:
@@ -45,6 +50,21 @@ class FileConfig(ProviderConfig):
             raise ValueError(
                 "S3 bucket name is required when using S3 provider"
             )
+
+        if self.provider == "azure_blob":
+            if not self.container_name and not os.getenv(
+                "AZURE_STORAGE_CONTAINER_NAME"
+            ):
+                raise ValueError(
+                    "Azure container name is required when using Azure Blob provider"
+                )
+
+            if not self.connection_string and not os.getenv(
+                "AZURE_STORAGE_CONNECTION_STRING"
+            ):
+                raise ValueError(
+                    "Azure storage connection string is required when using Azure Blob provider"
+                )
 
 
 class FileProvider(Provider, ABC):

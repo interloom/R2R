@@ -60,6 +60,12 @@ provider = "bcrypt"
 
 [file]
 provider = "postgres"
+# Object-store providers (`s3`, `azure_blob`) are optimized for explicit
+# document IDs when exporting or listing files. They do not offer the same
+# broad filtering semantics as the Postgres-backed file store.
+# For Azure Blob storage
+# container_name = ""
+# connection_string = ""
 
 [database]
 default_collection_name = "Default"
