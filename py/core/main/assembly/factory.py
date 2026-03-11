@@ -230,21 +230,31 @@ class R2RProviderFactory:
 
     @staticmethod
     def create_file_provider(
-        config: FileConfig, database_provider=None, *args, **kwargs
+        config: FileConfig,
+        database_provider: Optional[PostgresDatabaseProvider] = None,
+        *args,
+        **kwargs,
     ):
         if config.provider == "postgres":
             from core.providers import PostgresFileProvider
 
+            assert database_provider is not None
+            postgres_database_provider = database_provider
+
             return PostgresFileProvider(
                 config=config,
-                project_name=database_provider.project_name,
-                connection_manager=database_provider.connection_manager,
+                project_name=postgres_database_provider.project_name,
+                connection_manager=postgres_database_provider.connection_manager,
             )
 
         elif config.provider == "s3":
             from core.providers import S3FileProvider
 
             return S3FileProvider(config)
+        elif config.provider == "local":
+            from core.providers import LocalFileProvider
+
+            return LocalFileProvider(config)
         else:
             raise ValueError(f"File provider {config.provider} not supported")
 

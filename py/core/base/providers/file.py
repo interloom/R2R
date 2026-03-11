@@ -25,6 +25,9 @@ class FileConfig(ProviderConfig):
     region_name: Optional[str] = None
     endpoint_url: Optional[str] = None
 
+    # Local filesystem-specific configuration
+    base_path: Optional[str] = None
+
     @property
     def supported_providers(self) -> list[str]:
         """
@@ -32,6 +35,7 @@ class FileConfig(ProviderConfig):
         """
         return [
             "postgres",
+            "local",
             "s3",
         ]
 
@@ -44,6 +48,13 @@ class FileConfig(ProviderConfig):
         ):
             raise ValueError(
                 "S3 bucket name is required when using S3 provider"
+            )
+
+        if self.provider == "local" and (
+            not self.base_path and not os.getenv("LOCAL_FILE_STORAGE_PATH")
+        ):
+            raise ValueError(
+                "Local file storage base path is required when using local provider"
             )
 
 

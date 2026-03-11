@@ -14,6 +14,16 @@ The application uses the environment variable you set to locate your configurati
 R2R_CONFIG_PATH=/app/user_configs/<config>.toml
 ```
 
+For local file storage in a single-node or shared-volume deployment, you can use:
+
+```toml
+[file]
+provider = "local"
+base_path = "/app/storage/files"
+```
+
+Make sure `LOCAL_FILE_STORAGE_PATH` points at the same mounted path and that your Docker setup persists `/app/storage`.
+
 If you want to use a different filename, update the `R2R_CONFIG_PATH` variable in your environment file to point to your custom file, for example:
 ```
 R2R_CONFIG_PATH=/app/user_configs/my_custom_config.toml

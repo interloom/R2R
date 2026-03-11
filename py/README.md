@@ -68,6 +68,24 @@ python -m r2r.serve
 
 For detailed self-hosting instructions, see the [self-hosting docs](https://r2r-docs.sciphi.ai/self-hosting/installation/overview).
 
+## File Storage Backends
+
+R2R can store original documents in Postgres, S3, or the local filesystem.
+
+```toml
+[file]
+provider = "local"
+base_path = "/app/storage/files"
+```
+
+Set `LOCAL_FILE_STORAGE_PATH` to the same path if you want to configure it via environment variables.
+
+- `postgres`: best choice when you want database-backed file metadata and storage together
+- `s3`: object-store backend for external blob storage
+- `local`: filesystem-backed storage for single-node or shared-volume self-hosted deployments
+
+When using `local`, make sure `/app/storage` is mounted to persistent storage in Docker or your deployment environment.
+
 ## Demo
 https://github.com/user-attachments/assets/173f7a1f-7c0b-4055-b667-e2cdcf70128b
 

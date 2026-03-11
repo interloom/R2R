@@ -1,7 +1,9 @@
+from .local import LocalFileProvider
 from .postgres import PostgresFileProvider
 from .s3 import S3FileProvider
 
 __all__ = [
+    "LocalFileProvider",
     "PostgresFileProvider",
     "S3FileProvider",
 ]

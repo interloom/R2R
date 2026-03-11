@@ -13,6 +13,7 @@ from core.providers import (
     JwtAuthProvider,
     LiteLLMCompletionProvider,
     LiteLLMEmbeddingProvider,
+    LocalFileProvider,
     MailerSendEmailProvider,
     MistralOCRProvider,
     OllamaEmbeddingProvider,
@@ -61,7 +62,7 @@ class R2RProviders(BaseModel):
         | OpenAIEmbeddingProvider
         | OllamaEmbeddingProvider
     )
-    file: PostgresFileProvider | S3FileProvider
+    file: PostgresFileProvider | S3FileProvider | LocalFileProvider
     completion_embedding: (
         LiteLLMEmbeddingProvider
         | OpenAIEmbeddingProvider

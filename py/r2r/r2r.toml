@@ -60,6 +60,9 @@ provider = "bcrypt"
 
 [file]
 provider = "postgres"
+# For local filesystem storage in single-node or shared-volume deployments
+# provider = "local"
+# base_path = "/app/storage/files"
 
 [database]
 default_collection_name = "Default"

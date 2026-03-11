@@ -23,6 +23,7 @@ from .embeddings import (
     OpenAIEmbeddingProvider,
 )
 from .file import (
+    LocalFileProvider,
     PostgresFileProvider,
     S3FileProvider,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "SendGridEmailProvider",
     "MailerSendEmailProvider",
     # File
+    "LocalFileProvider",
     "PostgresFileProvider",
     "S3FileProvider",
     # LLM
