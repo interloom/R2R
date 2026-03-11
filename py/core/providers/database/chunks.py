@@ -342,8 +342,16 @@ class PostgresChunksHandler(Handler):
             f"{table_name}.collection_ids",
             f"{table_name}.text",
         ]
+        filtered_cols = [
+            "id",
+            "document_id",
+            "owner_id",
+            "collection_ids",
+            "text",
+        ]
 
         params: list[str | int | bytes] = []
+        has_filters = bool(search_settings.filters)
 
         # For binary vectors (INT1), implement two-stage search
         if self.quantization_type == VectorQuantizationType.INT1:
@@ -374,10 +382,16 @@ class PostgresChunksHandler(Handler):
             cols.append(
                 f"{table_name}.vec"
             )  # Need original vector for re-ranking
+            filtered_cols.append("vec")
             if search_settings.include_metadatas:
                 cols.append(f"{table_name}.metadata")
+                filtered_cols.append("metadata")
 
             select_clause = ", ".join(cols)
+            filtered_select_clause = ", ".join(filtered_cols)
+            filtered_stage1_select_clause = (
+                f"{select_clause}, {table_name}.vec_binary"
+            )
             where_clause = ""
             params.append(stage1_param)
 
@@ -391,29 +405,57 @@ class PostgresChunksHandler(Handler):
             )
 
             # First stage: Get candidates using binary search
-            query = f"""
-            WITH candidates AS (
-                SELECT {select_clause},
-                    ({stage1_distance}) as binary_distance
-                FROM {table_name}
-                {where_clause}
-                ORDER BY {stage1_distance}
-                LIMIT ${len(params) + 1}
-                OFFSET ${len(params) + 2}
-            )
-            -- Second stage: Re-rank using original vectors
-            SELECT
-                id,
-                document_id,
-                owner_id,
-                collection_ids,
-                text,
-                {"metadata," if search_settings.include_metadatas else ""}
-                (vec <=> ${len(params) + 4}::vector{vector_dim}) as distance
-            FROM candidates
-            ORDER BY distance
-            LIMIT ${len(params) + 3}
-            """
+            if has_filters:
+                query = f"""
+                WITH filtered AS MATERIALIZED (
+                    SELECT {filtered_stage1_select_clause}
+                    FROM {table_name}
+                    {where_clause}
+                ),
+                candidates AS (
+                    SELECT *,
+                        (vec_binary {binary_search_measure_repr} $1::bit{bit_dim}) as binary_distance
+                    FROM filtered
+                    ORDER BY vec_binary {binary_search_measure_repr} $1::bit{bit_dim}
+                    LIMIT ${len(params) + 1}
+                    OFFSET ${len(params) + 2}
+                )
+                -- Second stage: Re-rank using original vectors
+                SELECT
+                    id,
+                    document_id,
+                    owner_id,
+                    collection_ids,
+                    text,
+                    {"metadata," if search_settings.include_metadatas else ""}
+                    (vec <=> ${len(params) + 4}::vector{vector_dim}) as distance
+                FROM candidates
+                ORDER BY distance
+                LIMIT ${len(params) + 3}
+                """
+            else:
+                query = f"""
+                WITH candidates AS (
+                    SELECT {select_clause},
+                        ({stage1_distance}) as binary_distance
+                    FROM {table_name}
+                    ORDER BY {stage1_distance}
+                    LIMIT ${len(params) + 1}
+                    OFFSET ${len(params) + 2}
+                )
+                -- Second stage: Re-rank using original vectors
+                SELECT
+                    id,
+                    document_id,
+                    owner_id,
+                    collection_ids,
+                    text,
+                    {"metadata," if search_settings.include_metadatas else ""}
+                    (vec <=> ${len(params) + 4}::vector{vector_dim}) as distance
+                FROM candidates
+                ORDER BY distance
+                LIMIT ${len(params) + 3}
+                """
 
             params.extend(
                 [
@@ -431,13 +473,19 @@ class PostgresChunksHandler(Handler):
             )
             distance_calc = f"{table_name}.vec {search_settings.chunk_settings.index_measure.pgvector_repr} $1::vector{vector_dim}"
             query_param = str(query_vector)
+            filtered_inner_cols = filtered_cols + ["vec"]
+            filtered_outer_cols = filtered_cols.copy()
 
             if search_settings.include_scores:
                 cols.append(f"({distance_calc}) AS distance")
             if search_settings.include_metadatas:
                 cols.append(f"{table_name}.metadata")
+                filtered_inner_cols.append("metadata")
+                filtered_outer_cols.append("metadata")
 
             select_clause = ", ".join(cols)
+            filtered_inner_select_clause = ", ".join(filtered_inner_cols)
+            filtered_outer_select_clause = ", ".join(filtered_outer_cols)
             where_clause = ""
             params.append(query_param)
 
@@ -449,14 +497,33 @@ class PostgresChunksHandler(Handler):
                 )
                 params = new_params
 
-            query = f"""
-            SELECT {select_clause}
-            FROM {table_name}
-            {where_clause}
-            ORDER BY {distance_calc}
-            LIMIT ${len(params) + 1}
-            OFFSET ${len(params) + 2}
-            """
+            if has_filters:
+                outer_select_clause = filtered_outer_select_clause
+                if search_settings.include_scores:
+                    outer_select_clause = (
+                        f"{outer_select_clause}, "
+                        f"(vec {search_settings.chunk_settings.index_measure.pgvector_repr} $1::vector{vector_dim}) AS distance"
+                    )
+                query = f"""
+                WITH filtered AS MATERIALIZED (
+                    SELECT {filtered_inner_select_clause}
+                    FROM {table_name}
+                    {where_clause}
+                )
+                SELECT {outer_select_clause}
+                FROM filtered
+                ORDER BY vec {search_settings.chunk_settings.index_measure.pgvector_repr} $1::vector{vector_dim}
+                LIMIT ${len(params) + 1}
+                OFFSET ${len(params) + 2}
+                """
+            else:
+                query = f"""
+                SELECT {select_clause}
+                FROM {table_name}
+                ORDER BY {distance_calc}
+                LIMIT ${len(params) + 1}
+                OFFSET ${len(params) + 2}
+                """
             params.extend([search_settings.limit, search_settings.offset])
         results = await self.connection_manager.fetch_query(query, params)
 
