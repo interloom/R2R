@@ -49,6 +49,7 @@ jobs:
 
   integration-test-azure-openai:
     needs: package-install-test
+    if: ${{ secrets.OPENAI_API_KEY != '' && secrets.AZURE_API_KEY != '' && secrets.AZURE_API_BASE != '' && secrets.AZURE_API_VERSION != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -129,6 +130,7 @@ jobs:
 
   integration-test-gemini:
     needs: package-install-test
+    if: ${{ secrets.GEMINI_API_KEY != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -213,6 +215,7 @@ jobs:
 
   integration-test-azure-openai-full:
     needs: integration-test-azure-openai
+    if: ${{ needs.integration-test-azure-openai.result == 'success' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
