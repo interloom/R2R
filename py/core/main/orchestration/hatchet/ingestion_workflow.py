@@ -175,8 +175,8 @@ def hatchet_ingestion_factory(
                         status=GraphConstructionStatus.OUTDATED,
                     )
                 else:
-                    for collection_id_str in collection_ids:
-                        collection_id = UUID(collection_id_str)
+                    for collection_id_value in collection_ids:
+                        collection_id = UUID(str(collection_id_value))
                         try:
                             name = document_info.title or "N/A"
                             description = ""
@@ -452,8 +452,8 @@ def hatchet_ingestion_factory(
                         status=GraphConstructionStatus.OUTDATED,
                     )
                 else:
-                    for collection_id_str in collection_ids:
-                        collection_id = UUID(collection_id_str)
+                    for collection_id_value in collection_ids:
+                        collection_id = UUID(str(collection_id_value))
                         try:
                             name = document_info.title or "N/A"
                             description = ""
