@@ -7,6 +7,7 @@ on:
 
 jobs:
   setup:
+    if: ${{ secrets.OPENAI_API_KEY != '' && secrets.AZURE_API_KEY != '' && secrets.AZURE_API_BASE != '' && secrets.AZURE_API_VERSION != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +39,7 @@ jobs:
 
   v3-integration-tests:
     needs: setup
+    if: ${{ secrets.OPENAI_API_KEY != '' && secrets.AZURE_API_KEY != '' && secrets.AZURE_API_BASE != '' && secrets.AZURE_API_VERSION != '' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
