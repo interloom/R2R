@@ -72,7 +72,9 @@ async def test_documents_handler_uses_configured_full_text_language():
 
     assert execute_query.await_args is not None
     create_query = execute_query.await_args.args[0]
-    assert "to_tsvector('simple'::regconfig, COALESCE(title, ''))" in create_query
+    assert (
+        "to_tsvector('simple'::regconfig, COALESCE(title, ''))" in create_query
+    )
 
     assert fetch_query.await_args is not None
     search_query = fetch_query.await_args.args[0]

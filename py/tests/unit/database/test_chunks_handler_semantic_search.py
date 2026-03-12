@@ -23,7 +23,9 @@ async def test_semantic_search_materializes_filtered_fp32_results():
         quantization_type=VectorQuantizationType.FP32,
     )
     settings = SearchSettings(
-        filters={"document_id": {"$in": ["11111111-1111-4111-8111-111111111111"]}},
+        filters={
+            "document_id": {"$in": ["11111111-1111-4111-8111-111111111111"]}
+        },
         limit=10,
         offset=0,
     )
@@ -76,7 +78,9 @@ async def test_semantic_search_materializes_filtered_int1_candidates():
         quantization_type=VectorQuantizationType.INT1,
     )
     settings = SearchSettings(
-        filters={"document_id": {"$in": ["11111111-1111-4111-8111-111111111111"]}},
+        filters={
+            "document_id": {"$in": ["11111111-1111-4111-8111-111111111111"]}
+        },
         limit=10,
         offset=0,
     )
