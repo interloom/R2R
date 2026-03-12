@@ -59,7 +59,7 @@ async def test_semantic_search_keeps_direct_knn_path_without_filters():
     query = fetch_query.await_args.args[0]
     assert "WITH filtered AS MATERIALIZED" not in query
     assert "FROM filtered" not in query
-    assert "FROM test_project.chunks" in query
+    assert 'FROM "test_project"."chunks"' in query
 
 
 @pytest.mark.asyncio

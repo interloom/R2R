@@ -25,6 +25,7 @@ base_dimension = 512
 base_model = "openai/text-embedding-3-small"
 
 [database]
+full_text_search_language = "english"
   [database.limits]
   global_per_min = 10  # Small enough to test quickly
   monthly_limit = 20  # Small enough to test in one run

@@ -130,6 +130,7 @@ class PostgresDatabaseProvider(DatabaseProvider):
         self.default_collection_description = (
             config.default_collection_description
         )
+        self.full_text_search_language = config.full_text_search_language
 
         self.connection_manager: PostgresConnectionManager = (
             PostgresConnectionManager()
@@ -138,6 +139,7 @@ class PostgresDatabaseProvider(DatabaseProvider):
             project_name=self.project_name,
             connection_manager=self.connection_manager,
             dimension=self.dimension,
+            full_text_search_language=self.full_text_search_language,
         )
         self.token_handler = PostgresTokensHandler(
             self.project_name, self.connection_manager
@@ -153,6 +155,7 @@ class PostgresDatabaseProvider(DatabaseProvider):
             connection_manager=self.connection_manager,
             dimension=self.dimension,
             quantization_type=(self.quantization_type),
+            full_text_search_language=self.full_text_search_language,
         )
         self.conversations_handler = PostgresConversationsHandler(
             self.project_name, self.connection_manager

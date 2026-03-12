@@ -115,6 +115,7 @@ default_collection_description = "Your default collection."
 collection_summary_system_prompt = "system"
 collection_summary_prompt = "collection_summary"
 disable_create_extension = false
+full_text_search_language = "english"
 
   # PostgreSQL tuning settings
   [database.postgres_configuration_settings]

@@ -26,7 +26,7 @@ from core.base.utils import _decorate_vector_type
 
 from .base import PostgresConnectionManager
 from .filters import apply_filters
-from .utils import psql_quote_literal
+from .utils import psql_quote_literal, psql_regconfig_literal
 
 logger = logging.getLogger()
 
@@ -81,10 +81,15 @@ class PostgresChunksHandler(Handler):
         connection_manager: PostgresConnectionManager,
         dimension: int | float,
         quantization_type: VectorQuantizationType,
+        full_text_search_language: str = "english",
     ):
         super().__init__(project_name, connection_manager)
         self.dimension = dimension
         self.quantization_type = quantization_type
+        self.full_text_search_language = full_text_search_language
+        self.full_text_search_regconfig = psql_regconfig_literal(
+            full_text_search_language
+        )
 
     async def create_tables(self):
         # First check if table already exists and validate dimensions
@@ -172,12 +177,12 @@ class PostgresChunksHandler(Handler):
             {binary_col}
             text TEXT,
             metadata JSONB,
-            fts tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED
+            fts tsvector GENERATED ALWAYS AS (to_tsvector({self.full_text_search_regconfig}, text)) STORED
         );
         CREATE INDEX IF NOT EXISTS idx_vectors_document_id ON {self._get_table_name(PostgresChunksHandler.TABLE_NAME)} (document_id);
         CREATE INDEX IF NOT EXISTS idx_vectors_owner_id ON {self._get_table_name(PostgresChunksHandler.TABLE_NAME)} (owner_id);
         CREATE INDEX IF NOT EXISTS idx_vectors_collection_ids ON {self._get_table_name(PostgresChunksHandler.TABLE_NAME)} USING GIN (collection_ids);
-        CREATE INDEX IF NOT EXISTS idx_vectors_text ON {self._get_table_name(PostgresChunksHandler.TABLE_NAME)} USING GIN (to_tsvector('english', text));
+        CREATE INDEX IF NOT EXISTS idx_vectors_text ON {self._get_table_name(PostgresChunksHandler.TABLE_NAME)} USING GIN (to_tsvector({self.full_text_search_regconfig}, text));
         """
 
         await self.connection_manager.execute_query(query)
@@ -554,7 +559,9 @@ class PostgresChunksHandler(Handler):
         conditions = []
         params: list[str | int | bytes] = [query_text]
 
-        conditions.append("fts @@ websearch_to_tsquery('english', $1)")
+        conditions.append(
+            f"fts @@ websearch_to_tsquery({self.full_text_search_regconfig}, $1)"
+        )
 
         if search_settings.filters:
             filter_condition, params = apply_filters(
@@ -573,7 +580,7 @@ class PostgresChunksHandler(Handler):
                 collection_ids,
                 text,
                 metadata,
-                ts_rank(fts, websearch_to_tsquery('english', $1), 32) as rank
+                ts_rank(fts, websearch_to_tsquery({self.full_text_search_regconfig}, $1), 32) as rank
             FROM {self._get_table_name(PostgresChunksHandler.TABLE_NAME)}
             {where_clause}
             ORDER BY rank DESC
@@ -1257,8 +1264,8 @@ class PostgresChunksHandler(Handler):
                     CASE WHEN $1 = '' THEN 0.0
                     ELSE
                         ts_rank_cd(
-                            setweight(to_tsvector('english', {metadata_fields_expr}), 'A'),
-                            websearch_to_tsquery('english', $1),
+                            setweight(to_tsvector({self.full_text_search_regconfig}, {metadata_fields_expr}), 'A'),
+                            websearch_to_tsquery({self.full_text_search_regconfig}, $1),
                             32
                         )
                     END as metadata_rank
@@ -1272,14 +1279,14 @@ class PostgresChunksHandler(Handler):
                     document_id,
                     AVG(
                         ts_rank_cd(
-                            setweight(to_tsvector('english', COALESCE(text, '')), 'B'),
-                            websearch_to_tsquery('english', $1),
+                            setweight(to_tsvector({self.full_text_search_regconfig}, COALESCE(text, '')), 'B'),
+                            websearch_to_tsquery({self.full_text_search_regconfig}, $1),
                             32
                         )
                     ) as body_rank
                 FROM {self._get_table_name(PostgresChunksHandler.TABLE_NAME)}
                 WHERE $1 != ''
-                {"AND to_tsvector('english', text) @@ websearch_to_tsquery('english', $1)" if search_over_body else ""}
+                {f"AND to_tsvector({self.full_text_search_regconfig}, text) @@ websearch_to_tsquery({self.full_text_search_regconfig}, $1)" if search_over_body else ""}
                 GROUP BY document_id
             ),
             -- Combined scores with document metadata

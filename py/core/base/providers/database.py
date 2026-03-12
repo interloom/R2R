@@ -140,6 +140,7 @@ class DatabaseConfig(ProviderConfig):
     collection_summary_system_prompt: str = "system"
     collection_summary_prompt: str = "collection_summary"
     disable_create_extension: bool = False
+    full_text_search_language: str = "english"
 
     # Graph settings
     batch_size: Optional[int] = 1

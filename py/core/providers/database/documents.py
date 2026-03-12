@@ -24,6 +24,7 @@ from core.base import (
 
 from .base import PostgresConnectionManager
 from .filters import apply_filters
+from .utils import psql_regconfig_literal
 
 logger = logging.getLogger()
 
@@ -75,9 +76,14 @@ class PostgresDocumentsHandler(Handler):
         project_name: str,
         connection_manager: PostgresConnectionManager,
         dimension: int | float,
+        full_text_search_language: str = "english",
     ):
         self.dimension = dimension
         super().__init__(project_name, connection_manager)
+        self.full_text_search_language = full_text_search_language
+        self.full_text_search_regconfig = psql_regconfig_literal(
+            full_text_search_language
+        )
 
     async def create_tables(self):
         logger.info(
@@ -108,9 +114,9 @@ class PostgresDocumentsHandler(Handler):
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
                 ingestion_attempt_number INT DEFAULT 0,
                 raw_tsvector tsvector GENERATED ALWAYS AS (
-                    setweight(to_tsvector('english', COALESCE(title, '')), 'A') ||
-                    setweight(to_tsvector('english', COALESCE(summary, '')), 'B') ||
-                    setweight(to_tsvector('english', COALESCE((metadata->>'description')::text, '')), 'C')
+                    setweight(to_tsvector({self.full_text_search_regconfig}, COALESCE(title, '')), 'A') ||
+                    setweight(to_tsvector({self.full_text_search_regconfig}, COALESCE(summary, '')), 'B') ||
+                    setweight(to_tsvector({self.full_text_search_regconfig}, COALESCE((metadata->>'description')::text, '')), 'C')
                 ) STORED,
                 total_tokens INT DEFAULT 0
             );
@@ -846,7 +852,9 @@ class PostgresDocumentsHandler(Handler):
     ) -> list[DocumentResponse]:
         """Enhanced full-text search using generated tsvector."""
 
-        where_clauses = ["raw_tsvector @@ websearch_to_tsquery('english', $1)"]
+        where_clauses = [
+            f"raw_tsvector @@ websearch_to_tsquery({self.full_text_search_regconfig}, $1)"
+        ]
         params: list[str | int | bytes] = [query_text]
 
         filters = copy.deepcopy(search_settings.filters)
@@ -877,7 +885,7 @@ class PostgresDocumentsHandler(Handler):
                 summary,
                 summary_embedding,
                 total_tokens,
-                ts_rank_cd(raw_tsvector, websearch_to_tsquery('english', $1), 32) as text_score
+                ts_rank_cd(raw_tsvector, websearch_to_tsquery({self.full_text_search_regconfig}, $1), 32) as text_score
             FROM {self._get_table_name(PostgresDocumentsHandler.TABLE_NAME)}
             WHERE {where_clause}
             ORDER BY text_score DESC

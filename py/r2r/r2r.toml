@@ -65,6 +65,7 @@ provider = "postgres"
 default_collection_name = "Default"
 default_collection_description = "Your default collection."
 collection_summary_prompt = "collection_summary"
+full_text_search_language = "english"
 
   [database.graph_creation_settings]
     graph_entity_description_prompt = "graph_entity_description"

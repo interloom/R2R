@@ -68,6 +68,7 @@ async def chunks_handler(db_provider):
         connection_manager=connection_manager,
         dimension=dimension,
         quantization_type=quantization_type,
+        full_text_search_language=db_provider.config.full_text_search_language,
     )
     await handler.create_tables()
     return handler
@@ -108,6 +109,7 @@ async def documents_handler(db_provider):
         project_name=project_name,
         connection_manager=connection_manager,
         dimension=dimension,
+        full_text_search_language=db_provider.config.full_text_search_language,
     )
     await handler.create_tables()
     return handler
