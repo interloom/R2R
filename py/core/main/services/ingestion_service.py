@@ -445,38 +445,38 @@ class IngestionService:
         vector_batch: list[VectorEntry] = []
         document_counts: dict[UUID, int] = {}
 
-        # We'll track usage from the first user we see; if your scenario allows
-        # multiple user owners in a single ingestion, you'd need to refine usage checks.
+        # We track usage from the first owner because an ingestion is expected
+        # to contain chunks for a single owner.
+        owner_id = vector_entries[0].owner_id
+        owner = await self.providers.database.users_handler.get_user_by_id(
+            owner_id
+        )
+
         current_usage = None
-        user_id_for_usage_check: UUID | None = None
-
-        count = 0
-
-        for msg in vector_entries:
-            # If we haven't set usage yet, do so on the first chunk
-            if current_usage is None:
-                user_id_for_usage_check = msg.owner_id
-                usage_data = (
-                    await self.providers.database.chunks_handler.list_chunks(
-                        limit=1,
-                        offset=0,
-                        filters={"owner_id": msg.owner_id},
-                    )
+        max_chunks = None
+        if not owner.is_superuser:
+            usage_data = (
+                await self.providers.database.chunks_handler.list_chunks(
+                    limit=1,
+                    offset=0,
+                    filters={"owner_id": owner_id},
                 )
-                current_usage = usage_data["total_entries"]
-
-            # Figure out the user's limit
-            user = await self.providers.database.users_handler.get_user_by_id(
-                msg.owner_id
             )
+            current_usage = usage_data["total_entries"]
             max_chunks = (
                 self.providers.database.config.app.default_max_chunks_per_user
                 if self.providers.database.config.app
                 else 1e10
             )
-            if user.limits_overrides and "max_chunks" in user.limits_overrides:
-                max_chunks = user.limits_overrides["max_chunks"]
+            if (
+                owner.limits_overrides
+                and "max_chunks" in owner.limits_overrides
+            ):
+                max_chunks = owner.limits_overrides["max_chunks"]
 
+        count = 0
+
+        for msg in vector_entries:
             # Add to our local batch
             vector_batch.append(msg)
             document_counts[msg.document_id] = (
@@ -487,6 +487,7 @@ class IngestionService:
             # Check usage
             if (
                 current_usage is not None
+                and max_chunks is not None
                 and (current_usage + len(vector_batch) + count) > max_chunks
             ):
                 error_message = f"User {msg.owner_id} has exceeded the maximum number of allowed chunks: {max_chunks}"
