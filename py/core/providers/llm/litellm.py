@@ -6,16 +6,24 @@ from litellm import acompletion, completion
 
 from core.base.abstractions import GenerationConfig
 from core.base.providers.llm import CompletionConfig, CompletionProvider
+from core.billing import BillingUsageRecorder
 
 logger = logging.getLogger()
 
 
 class LiteLLMCompletionProvider(CompletionProvider):
-    def __init__(self, config: CompletionConfig, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        config: CompletionConfig,
+        *args,
+        billing_usage_recorder: BillingUsageRecorder | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(config)
         litellm.modify_params = True
         self.acompletion = acompletion
         self.completion = completion
+        self.billing_usage_recorder = billing_usage_recorder
 
         # if config.provider != "litellm":
         #     logger.error(f"Invalid provider: {config.provider}")
@@ -54,11 +62,35 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args["messages"] = messages
         args = {**args, **kwargs}
 
+        billing_event_id = None
+        if self.billing_usage_recorder is not None:
+            billing_event_id = await self.billing_usage_recorder.start_call(
+                operation="completion",
+                model=args["model"],
+            )
+            args = self.billing_usage_recorder.add_litellm_metadata(
+                kwargs=args,
+                event_id=billing_event_id,
+            )
+
         logger.debug(
             f"Executing LiteLLM task with generation_config={generation_config}"
         )
 
-        return await self.acompletion(**args)
+        try:
+            response = await self.acompletion(**args)
+        except Exception as error:
+            if self.billing_usage_recorder is not None:
+                await self.billing_usage_recorder.fail_call(
+                    billing_event_id, error
+                )
+            raise
+
+        if self.billing_usage_recorder is not None:
+            await self.billing_usage_recorder.complete_call(
+                billing_event_id, response
+            )
+        return response
 
     def _execute_task_sync(self, task: dict[str, Any]):
         messages = task["messages"]

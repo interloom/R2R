@@ -18,6 +18,7 @@ from core.base import (
     OrchestrationConfig,
     SchedulerConfig,
 )
+from core.billing import BillingUsageRecorder
 from core.providers import (
     AnthropicCompletionProvider,
     APSchedulerProvider,
@@ -250,7 +251,10 @@ class R2RProviderFactory:
 
     @staticmethod
     def create_embedding_provider(
-        embedding: EmbeddingConfig, *args, **kwargs
+        embedding: EmbeddingConfig,
+        *args,
+        billing_usage_recorder: BillingUsageRecorder | None = None,
+        **kwargs,
     ) -> (
         LiteLLMEmbeddingProvider
         | OllamaEmbeddingProvider
@@ -270,7 +274,10 @@ class R2RProviderFactory:
         elif embedding.provider == "litellm":
             from core.providers import LiteLLMEmbeddingProvider
 
-            embedding_provider = LiteLLMEmbeddingProvider(embedding)
+            embedding_provider = LiteLLMEmbeddingProvider(
+                embedding,
+                billing_usage_recorder=billing_usage_recorder,
+            )
 
         elif embedding.provider == "ollama":
             from core.providers import OllamaEmbeddingProvider
@@ -286,7 +293,10 @@ class R2RProviderFactory:
 
     @staticmethod
     def create_llm_provider(
-        llm_config: CompletionConfig, *args, **kwargs
+        llm_config: CompletionConfig,
+        *args,
+        billing_usage_recorder: BillingUsageRecorder | None = None,
+        **kwargs,
     ) -> (
         AnthropicCompletionProvider
         | LiteLLMCompletionProvider
@@ -297,7 +307,10 @@ class R2RProviderFactory:
         if llm_config.provider == "anthropic":
             llm_provider = AnthropicCompletionProvider(llm_config)
         elif llm_config.provider == "litellm":
-            llm_provider = LiteLLMCompletionProvider(llm_config)
+            llm_provider = LiteLLMCompletionProvider(
+                llm_config,
+                billing_usage_recorder=billing_usage_recorder,
+            )
         elif llm_config.provider == "openai":
             llm_provider = OpenAICompletionProvider(llm_config)
         elif llm_config.provider == "r2r":
@@ -398,24 +411,6 @@ class R2RProviderFactory:
                 f"Both embedding configurations must use the same dimensions. Got {self.config.embedding.base_dimension} and {self.config.completion_embedding.base_dimension}"
             )
 
-        embedding_provider = (
-            embedding_provider_override
-            or self.create_embedding_provider(
-                self.config.embedding, *args, **kwargs
-            )
-        )
-
-        completion_embedding_provider = (
-            embedding_provider_override
-            or self.create_embedding_provider(
-                self.config.completion_embedding, *args, **kwargs
-            )
-        )
-
-        llm_provider = llm_provider_override or self.create_llm_provider(
-            self.config.completion, *args, **kwargs
-        )
-
         crypto_provider = (
             crypto_provider_override
             or self.create_crypto_provider(self.config.crypto, *args, **kwargs)
@@ -426,6 +421,36 @@ class R2RProviderFactory:
             or await self.create_database_provider(
                 self.config.database, crypto_provider, *args, **kwargs
             )
+        )
+        billing_usage_recorder = BillingUsageRecorder(
+            database_provider.billing_outbox_handler
+        )
+
+        embedding_provider = (
+            embedding_provider_override
+            or self.create_embedding_provider(
+                self.config.embedding,
+                *args,
+                billing_usage_recorder=billing_usage_recorder,
+                **kwargs,
+            )
+        )
+
+        completion_embedding_provider = (
+            embedding_provider_override
+            or self.create_embedding_provider(
+                self.config.completion_embedding,
+                *args,
+                billing_usage_recorder=billing_usage_recorder,
+                **kwargs,
+            )
+        )
+
+        llm_provider = llm_provider_override or self.create_llm_provider(
+            self.config.completion,
+            *args,
+            billing_usage_recorder=billing_usage_recorder,
+            **kwargs,
         )
 
         file_provider = self.create_file_provider(

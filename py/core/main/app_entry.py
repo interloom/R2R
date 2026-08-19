@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -9,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from core.base import R2RException
+from core.billing import BillingOutboxDispatcher
 from core.utils.logging_config import configure_logging
 
 from .app import R2RApp
@@ -42,7 +44,22 @@ async def lifespan(app: FastAPI):
     # Start the Hatchet worker
     await r2r_app.orchestration_provider.start_worker()
 
-    yield
+    billing_dispatcher = BillingOutboxDispatcher.from_environment(
+        r2r_app.providers.database.billing_outbox_handler
+    )
+    billing_dispatcher_task = (
+        asyncio.create_task(billing_dispatcher.run())
+        if billing_dispatcher is not None
+        else None
+    )
+
+    try:
+        yield
+    finally:
+        if billing_dispatcher is not None:
+            await billing_dispatcher.stop()
+        if billing_dispatcher_task is not None:
+            await billing_dispatcher_task
 
     # # Shutdown
     scheduler.shutdown()

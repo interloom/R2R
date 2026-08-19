@@ -16,6 +16,7 @@ from core.base import (
     EmbeddingProvider,
     R2RException,
 )
+from core.billing import BillingUsageRecorder
 
 from .utils import truncate_texts_to_token_limit
 
@@ -27,12 +28,14 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
         self,
         config: EmbeddingConfig,
         *args,
+        billing_usage_recorder: BillingUsageRecorder | None = None,
         **kwargs,
     ) -> None:
         super().__init__(config)
 
         self.litellm_embedding = embedding
         self.litellm_aembedding = aembedding
+        self.billing_usage_recorder = billing_usage_recorder
 
         provider = config.provider
         if not provider:
@@ -79,6 +82,7 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
     async def _execute_task(self, task: dict[str, Any]) -> list[list[float]]:
         texts = task["texts"]
         kwargs = self._get_embedding_kwargs(**task.get("kwargs", {}))
+        billing_event_id = None
 
         if "dimensions" in kwargs and math.isnan(kwargs["dimensions"]):
             kwargs.pop("dimensions")
@@ -92,17 +96,42 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
                         texts, kwargs["model"]
                     )
 
+            if self.billing_usage_recorder is not None:
+                billing_event_id = (
+                    await self.billing_usage_recorder.start_call(
+                        operation="embedding",
+                        model=kwargs["model"],
+                    )
+                )
+                kwargs = self.billing_usage_recorder.add_litellm_metadata(
+                    kwargs=kwargs,
+                    event_id=billing_event_id,
+                )
+
             response = await self.litellm_aembedding(
                 input=texts,
                 **kwargs,
             )
+            if self.billing_usage_recorder is not None:
+                await self.billing_usage_recorder.complete_call(
+                    billing_event_id, response
+                )
             return [data["embedding"] for data in response.data]
-        except AuthenticationError:
+        except AuthenticationError as e:
+            if self.billing_usage_recorder is not None:
+                await self.billing_usage_recorder.fail_call(
+                    billing_event_id,
+                    e,
+                )
             logger.error(
                 "Authentication error: Invalid API key or credentials."
             )
             raise
         except Exception as e:
+            if self.billing_usage_recorder is not None:
+                await self.billing_usage_recorder.fail_call(
+                    billing_event_id, e
+                )
             error_msg = f"Error getting embeddings: {str(e)}"
             logger.error(error_msg)
 

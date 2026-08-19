@@ -10,6 +10,7 @@ from ...base.providers import (
     PostgresConfigurationSettings,
 )
 from .base import PostgresConnectionManager, SemaphoreConnectionPool
+from .billing_outbox import PostgresBillingOutboxHandler
 from .chunks import PostgresChunksHandler
 from .collections import PostgresCollectionsHandler
 from .conversations import PostgresConversationsHandler
@@ -55,6 +56,7 @@ class PostgresDatabaseProvider(DatabaseProvider):
     default_collection_description: str
 
     connection_manager: PostgresConnectionManager
+    billing_outbox_handler: PostgresBillingOutboxHandler
     documents_handler: PostgresDocumentsHandler
     collections_handler: PostgresCollectionsHandler
     token_handler: PostgresTokensHandler
@@ -133,6 +135,9 @@ class PostgresDatabaseProvider(DatabaseProvider):
 
         self.connection_manager: PostgresConnectionManager = (
             PostgresConnectionManager()
+        )
+        self.billing_outbox_handler = PostgresBillingOutboxHandler(
+            self.project_name, self.connection_manager
         )
         self.documents_handler = PostgresDocumentsHandler(
             project_name=self.project_name,
@@ -222,6 +227,7 @@ class PostgresDatabaseProvider(DatabaseProvider):
                 f'CREATE SCHEMA IF NOT EXISTS "{self.project_name}";'
             )
 
+        await self.billing_outbox_handler.create_tables()
         await self.documents_handler.create_tables()
         await self.collections_handler.create_tables()
         await self.token_handler.create_tables()

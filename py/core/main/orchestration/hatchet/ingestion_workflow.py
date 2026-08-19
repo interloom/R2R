@@ -17,6 +17,7 @@ from core.base import (
     generate_extraction_id,
 )
 from core.base.abstractions import DocumentResponse, R2RException
+from core.billing import with_billing_context_from_hatchet
 from core.utils import (
     generate_default_user_collection_id,
     num_tokens,
@@ -58,6 +59,7 @@ def hatchet_ingestion_factory(
                 return str(uuid.uuid4())
 
         @orchestration_provider.step(retries=0, timeout="60m")
+        @with_billing_context_from_hatchet
         async def parse(self, context: Context) -> dict:
             try:
                 logger.info("Initiating ingestion workflow, step: parse")
@@ -385,6 +387,7 @@ def hatchet_ingestion_factory(
             }
 
         @orchestration_provider.step(parents=["ingest"], timeout="60m")
+        @with_billing_context_from_hatchet
         async def embed(self, context: Context) -> dict:
             document_info_dict = context.step_output("ingest")["document_info"]
             document_info = DocumentResponse(**document_info_dict)
