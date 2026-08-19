@@ -10,6 +10,7 @@ from core.base import (
     GraphConstructionStatus,
     R2RException,
 )
+from core.billing import with_billing_context_from_input
 from core.utils import (
     generate_default_user_collection_id,
     generate_extraction_id,
@@ -23,6 +24,7 @@ logger = logging.getLogger()
 
 
 def simple_ingestion_factory(service: IngestionService):
+    @with_billing_context_from_input
     async def ingest_files(input_data):
         document_info = None
         try:
@@ -283,6 +285,7 @@ def simple_ingestion_factory(service: IngestionService):
             )
             raise e
 
+    @with_billing_context_from_input
     async def ingest_chunks(input_data):
         document_info = None
         try:
