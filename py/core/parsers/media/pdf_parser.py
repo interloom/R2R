@@ -202,6 +202,7 @@ class VLMPDFParser(AsyncParser[str | bytes]):
                     messages=messages,
                     generation_config=generation_config,
                     apply_timeout=True,
+                    metadata={"trace_name": "r2r-indexing"},
                 )
 
                 if response.choices and response.choices[0].message:

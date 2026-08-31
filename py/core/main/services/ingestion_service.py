@@ -322,6 +322,7 @@ class IngestionService:
                     model=self.config.ingestion.document_summary_model
                     or self.config.app.fast_llm
                 ),
+                metadata={"trace_name": "r2r-indexing"},
             )
 
             document_info.summary = response.choices[0].message.content  # type: ignore
@@ -331,6 +332,7 @@ class IngestionService:
 
             embedding = await self.providers.embedding.async_get_embedding(
                 text=document_info.summary,
+                metadata={"trace_name": "r2r-indexing"},
             )
             document_info.summary_embedding = embedding
         return
@@ -368,6 +370,7 @@ class IngestionService:
             # Retrieve embeddings in bulk
             vectors = await self.providers.embedding.async_get_embeddings(
                 texts,  # list of strings
+                metadata={"trace_name": "r2r-indexing"},
             )
             # Zip them back together
             results = []
@@ -757,6 +760,7 @@ class IngestionService:
                         ),
                         generation_config=chunk_enrichment_settings.generation_config
                         or GenerationConfig(model=self.config.app.fast_llm),
+                        metadata={"trace_name": "r2r-indexing"},
                     )
                 )
                 .choices[0]
@@ -776,7 +780,8 @@ class IngestionService:
 
         # Re-embed
         data = await self.providers.embedding.async_get_embedding(
-            updated_chunk_text
+            updated_chunk_text,
+            metadata={"trace_name": "r2r-indexing"},
         )
         chunk["metadata"]["original_text"] = chunk["text"]
 

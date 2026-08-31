@@ -305,7 +305,9 @@ class ImageParser(AsyncParser[str | bytes]):
                 ]
 
             response = await self.llm_provider.aget_completion(
-                messages=messages, generation_config=generation_config
+                messages=messages,
+                generation_config=generation_config,
+                metadata={"trace_name": "r2r-indexing"},
             )
 
             if not response.choices or not response.choices[0].message:

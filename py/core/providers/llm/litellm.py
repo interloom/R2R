@@ -53,6 +53,10 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args = self._get_base_args(generation_config)
         args["messages"] = messages
         args = {**args, **kwargs}
+        args["metadata"] = {
+            "trace_name": "r2r",
+            **(args.get("metadata") or {}),
+        }
 
         logger.debug(
             f"Executing LiteLLM task with generation_config={generation_config}"
@@ -68,6 +72,10 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args = self._get_base_args(generation_config)
         args["messages"] = messages
         args = {**args, **kwargs}
+        args["metadata"] = {
+            "trace_name": "r2r",
+            **(args.get("metadata") or {}),
+        }
 
         logger.debug(
             f"Executing LiteLLM task with generation_config={generation_config}"

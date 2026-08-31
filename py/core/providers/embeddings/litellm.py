@@ -74,6 +74,10 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
         if self.config.api_key:
             embedding_kwargs["api_key"] = self.config.api_key
         embedding_kwargs.update(kwargs)
+        embedding_kwargs["metadata"] = {
+            "trace_name": "r2r",
+            **(embedding_kwargs.get("metadata") or {}),
+        }
         return embedding_kwargs
 
     async def _execute_task(self, task: dict[str, Any]) -> list[list[float]]:
