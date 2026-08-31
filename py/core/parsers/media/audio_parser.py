@@ -52,10 +52,15 @@ class AudioParser(AsyncParser[bytes]):
                 temp_file_path = temp_file.name
 
             # Call Whisper transcription
+            metadata = {
+                **(kwargs.pop("metadata", None) or {}),
+                "trace_name": "r2r",
+            }
             response = await self.atranscription(
                 model=self.config.audio_transcription_model
                 or self.config.app.audio_lm,
                 file=open(temp_file_path, "rb"),
+                metadata=metadata,
                 **kwargs,
             )
 
