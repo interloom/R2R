@@ -16,6 +16,7 @@ from core.base import (
     EmbeddingProvider,
     R2RException,
 )
+from core.utils.observability import build_litellm_metadata
 
 from .utils import truncate_texts_to_token_limit
 
@@ -74,6 +75,11 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
         if self.config.api_key:
             embedding_kwargs["api_key"] = self.config.api_key
         embedding_kwargs.update(kwargs)
+        embedding_kwargs["metadata"] = build_litellm_metadata(
+            embedding_kwargs.get("metadata"),
+            default_trace_name="R2R: Embedding",
+            default_generation_name="R2R: Embedding",
+        )
         return embedding_kwargs
 
     async def _execute_task(self, task: dict[str, Any]) -> list[list[float]]:

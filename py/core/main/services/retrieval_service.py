@@ -48,6 +48,10 @@ from core.utils import (
     find_new_citation_spans,
     num_tokens_from_messages,
 )
+from core.utils.observability import (
+    r2r_observation_context,
+    r2r_trace_context,
+)
 from shared.api.models.management.responses import MessageResponse
 
 from ..abstractions import R2RProviders
@@ -269,14 +273,18 @@ class RetrievalService(Service):
         an AggregateSearchResult that includes chunk + graph results.
         """
         strategy = search_settings.search_strategy.lower()
-
-        if strategy == "hyde":
-            return await self._hyde_search(query, search_settings)
-        elif strategy == "rag_fusion":
-            return await self._rag_fusion_search(query, search_settings)
-        else:
-            # 'vanilla', 'basic', or anything else...
-            return await self._basic_search(query, search_settings)
+        with r2r_trace_context(
+            "R2R: Search",
+            tags=("r2r-search",),
+            metadata={"search_strategy": strategy},
+        ):
+            if strategy == "hyde":
+                return await self._hyde_search(query, search_settings)
+            elif strategy == "rag_fusion":
+                return await self._rag_fusion_search(query, search_settings)
+            else:
+                # 'vanilla', 'basic', or anything else...
+                return await self._basic_search(query, search_settings)
 
     async def _basic_search(
         self, query: str, search_settings: SearchSettings
@@ -293,11 +301,10 @@ class RetrievalService(Service):
             search_settings.use_semantic_search
             or search_settings.use_hybrid_search
         ):
-            query_vector = (
-                await self.providers.completion_embedding.async_get_embedding(
+            with r2r_observation_context("R2R: Query embedding"):
+                query_vector = await self.providers.completion_embedding.async_get_embedding(
                     text=query
                 )
-            )
 
         # -- 2) Chunk search
         chunk_results = []
@@ -433,10 +440,11 @@ class RetrievalService(Service):
             temperature=0.8,
             stream=False,
         )
-        response = await self.providers.llm.aget_completion(
-            messages=[{"role": "system", "content": prompt}],
-            generation_config=gen_config,
-        )
+        with r2r_observation_context("R2R: Search query generation"):
+            response = await self.providers.llm.aget_completion(
+                messages=[{"role": "system", "content": prompt}],
+                generation_config=gen_config,
+            )
         raw_text = (
             response.choices[0].message.content.strip()
             if response.choices[0].message.content is not None
@@ -624,9 +632,12 @@ class RetrievalService(Service):
         2) chunk search + graph search with that embedding
         """
         # Precompute the embedding of alt_text
-        vec = await self.providers.completion_embedding.async_get_embedding(
-            text=alt_text
-        )
+        with r2r_observation_context("R2R: HyDE document embedding"):
+            vec = (
+                await self.providers.completion_embedding.async_get_embedding(
+                    text=alt_text
+                )
+            )
 
         # chunk search
         chunk_results = []
@@ -669,11 +680,10 @@ class RetrievalService(Service):
             search_settings.use_semantic_search
             or search_settings.use_hybrid_search
         ):
-            query_vector = (
-                await self.providers.completion_embedding.async_get_embedding(
+            with r2r_observation_context("R2R: Query embedding"):
+                query_vector = await self.providers.completion_embedding.async_get_embedding(
                     text=query_text
                 )
-            )
 
         # 2) Choose which search to run
         if (
@@ -749,11 +759,10 @@ class RetrievalService(Service):
         # 1) Possibly embed
         query_embedding = precomputed_vector
         if query_embedding is None:
-            query_embedding = (
-                await self.providers.completion_embedding.async_get_embedding(
+            with r2r_observation_context("R2R: Graph query embedding"):
+                query_embedding = await self.providers.completion_embedding.async_get_embedding(
                     query_text
                 )
-            )
 
         base_limit = search_settings.limit
         graph_limits = search_settings.graph_settings.limits or {}
@@ -922,10 +931,11 @@ class RetrievalService(Service):
             stream=False,
         )
 
-        response = await self.providers.llm.aget_completion(
-            messages=[{"role": "system", "content": hyde_template}],
-            generation_config=completion_config,
-        )
+        with r2r_observation_context("R2R: HyDE generation"):
+            response = await self.providers.llm.aget_completion(
+                messages=[{"role": "system", "content": hyde_template}],
+                generation_config=completion_config,
+            )
 
         # Suppose the LLM returns something like:
         #
@@ -946,11 +956,10 @@ class RetrievalService(Service):
         query_embedding: Optional[list[float]] = None,
     ) -> list[DocumentResponse]:
         if query_embedding is None:
-            query_embedding = (
-                await self.providers.completion_embedding.async_get_embedding(
+            with r2r_observation_context("R2R: Document search embedding"):
+                query_embedding = await self.providers.completion_embedding.async_get_embedding(
                     query
                 )
-            )
 
         return (
             await self.providers.database.documents_handler.search_documents(
@@ -967,20 +976,24 @@ class RetrievalService(Service):
         *args,
         **kwargs,
     ):
-        return await self.providers.llm.aget_completion(
-            [message.to_dict() for message in messages],  # type: ignore
-            generation_config,
-            *args,
-            **kwargs,
-        )
+        with r2r_trace_context("R2R: Completion"):
+            with r2r_observation_context("R2R: Completion"):
+                return await self.providers.llm.aget_completion(
+                    [message.to_dict() for message in messages],  # type: ignore
+                    generation_config,
+                    *args,
+                    **kwargs,
+                )
 
     async def embedding(
         self,
         text: str,
     ):
-        return await self.providers.completion_embedding.async_get_embedding(
-            text=text
-        )
+        with r2r_trace_context("R2R: Embedding"):
+            with r2r_observation_context("R2R: Embedding"):
+                return await self.providers.completion_embedding.async_get_embedding(
+                    text=text
+                )
 
     async def rag(
         self,
@@ -1042,10 +1055,11 @@ class RetrievalService(Service):
             # 5) Check streaming vs. non-streaming
             if not rag_generation_config.stream:
                 # ========== Non-Streaming Logic ==========
-                response = await self.providers.llm.aget_completion(
-                    messages=messages,
-                    generation_config=rag_generation_config,
-                )
+                with r2r_observation_context("R2R: RAG response"):
+                    response = await self.providers.llm.aget_completion(
+                        messages=messages,
+                        generation_config=rag_generation_config,
+                    )
                 llm_text = response.choices[0].message.content
 
                 # (a) Extract short-ID references from final text

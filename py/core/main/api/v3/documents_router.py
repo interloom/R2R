@@ -39,6 +39,7 @@ from core.base.api.models import (
     WrappedRelationshipsResponse,
 )
 from core.utils import update_settings_from_dict
+from core.utils.observability import create_r2r_trace_id
 from shared.abstractions import IngestionMode
 
 from ...abstractions import R2RProviders, R2RServices
@@ -398,6 +399,7 @@ class DocumentsRouter(BaseRouterV3):
 
                 # Prepare workflow input
                 workflow_input = {
+                    "langfuse_trace_id": create_r2r_trace_id(),
                     "document_id": str(document_id),
                     "chunks": [
                         chunk.model_dump(mode="json")
@@ -508,6 +510,7 @@ class DocumentsRouter(BaseRouterV3):
                     )
 
             workflow_input = {
+                "langfuse_trace_id": create_r2r_trace_id(),
                 "file_data": file_data,
                 "document_id": str(document_id),
                 "collection_ids": (

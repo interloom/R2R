@@ -6,6 +6,7 @@ from litellm import acompletion, completion
 
 from core.base.abstractions import GenerationConfig
 from core.base.providers.llm import CompletionConfig, CompletionProvider
+from core.utils.observability import build_litellm_metadata
 
 logger = logging.getLogger()
 
@@ -53,6 +54,11 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args = self._get_base_args(generation_config)
         args["messages"] = messages
         args = {**args, **kwargs}
+        args["metadata"] = build_litellm_metadata(
+            args.get("metadata"),
+            default_trace_name="R2R: LLM completion",
+            default_generation_name="R2R: LLM completion",
+        )
 
         logger.debug(
             f"Executing LiteLLM task with generation_config={generation_config}"
@@ -68,6 +74,11 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args = self._get_base_args(generation_config)
         args["messages"] = messages
         args = {**args, **kwargs}
+        args["metadata"] = build_litellm_metadata(
+            args.get("metadata"),
+            default_trace_name="R2R: LLM completion",
+            default_generation_name="R2R: LLM completion",
+        )
 
         logger.debug(
             f"Executing LiteLLM task with generation_config={generation_config}"

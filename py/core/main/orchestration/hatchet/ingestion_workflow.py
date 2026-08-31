@@ -22,6 +22,12 @@ from core.utils import (
     num_tokens,
     update_settings_from_dict,
 )
+from core.utils.observability import (
+    build_r2r_ingestion_trace_context,
+    r2r_ingestion_trace_context,
+    reset_r2r_trace_context,
+    set_r2r_trace_context,
+)
 
 from ...services import IngestionService, IngestionServiceAdapter
 
@@ -59,9 +65,15 @@ def hatchet_ingestion_factory(
 
         @orchestration_provider.step(retries=0, timeout="60m")
         async def parse(self, context: Context) -> dict:
+            input_data = context.workflow_input()["request"]
+            trace_token = set_r2r_trace_context(
+                build_r2r_ingestion_trace_context(
+                    input_data,
+                    task_id=str(context.workflow_run_id()),
+                )
+            )
             try:
                 logger.info("Initiating ingestion workflow, step: parse")
-                input_data = context.workflow_input()["request"]
                 parsed_data = IngestionServiceAdapter.parse_ingest_file_input(
                     input_data
                 )
@@ -291,6 +303,8 @@ def hatchet_ingestion_factory(
                     status_code=500,
                     detail=f"Error during ingestion: {str(e)}",
                 ) from e
+            finally:
+                reset_r2r_trace_context(trace_token)
 
         @orchestration_provider.failure()
         async def on_failure(self, context: Context) -> None:
@@ -390,14 +404,18 @@ def hatchet_ingestion_factory(
             document_info = DocumentResponse(**document_info_dict)
 
             extractions = context.step_output("ingest")["extractions"]
-
-            embedding_generator = self.ingestion_service.embed_document(
-                extractions
-            )
-            embeddings = [
-                embedding.model_dump()
-                async for embedding in embedding_generator
-            ]
+            input_data = context.workflow_input()["request"]
+            with r2r_ingestion_trace_context(
+                input_data,
+                task_id=str(context.workflow_run_id()),
+            ):
+                embedding_generator = self.ingestion_service.embed_document(
+                    extractions
+                )
+                embeddings = [
+                    embedding.model_dump()
+                    async for embedding in embedding_generator
+                ]
 
             await self.ingestion_service.update_document_status(
                 document_info, status=IngestionStatus.STORING

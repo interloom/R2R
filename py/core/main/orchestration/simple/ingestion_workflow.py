@@ -16,6 +16,11 @@ from core.utils import (
     num_tokens,
     update_settings_from_dict,
 )
+from core.utils.observability import (
+    build_r2r_ingestion_trace_context,
+    reset_r2r_trace_context,
+    set_r2r_trace_context,
+)
 
 from ...services import IngestionService
 
@@ -24,6 +29,9 @@ logger = logging.getLogger()
 
 def simple_ingestion_factory(service: IngestionService):
     async def ingest_files(input_data):
+        trace_token = set_r2r_trace_context(
+            build_r2r_ingestion_trace_context(input_data)
+        )
         document_info = None
         try:
             from core.base import IngestionStatus
@@ -209,6 +217,8 @@ def simple_ingestion_factory(service: IngestionService):
             raise HTTPException(
                 status_code=500, detail=f"Error during ingestion: {str(e)}"
             ) from e
+        finally:
+            reset_r2r_trace_context(trace_token)
 
     async def _ensure_collections_exists(
         service: IngestionService,
@@ -284,6 +294,9 @@ def simple_ingestion_factory(service: IngestionService):
             raise e
 
     async def ingest_chunks(input_data):
+        trace_token = set_r2r_trace_context(
+            build_r2r_ingestion_trace_context(input_data)
+        )
         document_info = None
         try:
             from core.base import IngestionStatus
@@ -431,6 +444,8 @@ def simple_ingestion_factory(service: IngestionService):
                 status_code=500,
                 detail=f"Error during chunk ingestion: {str(e)}",
             ) from e
+        finally:
+            reset_r2r_trace_context(trace_token)
 
     async def update_chunk(input_data):
         from core.main import IngestionServiceAdapter

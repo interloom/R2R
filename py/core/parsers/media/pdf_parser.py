@@ -156,6 +156,10 @@ class VLMPDFParser(AsyncParser[str | bytes]):
                     messages=messages,
                     generation_config=generation_config,
                     apply_timeout=True,
+                    metadata={
+                        "generation_name": "R2R: PDF page extraction",
+                        "r2r_page_number": page_num,
+                    },
                     tools=[
                         {
                             "name": "parse_pdf_page",
@@ -202,6 +206,10 @@ class VLMPDFParser(AsyncParser[str | bytes]):
                     messages=messages,
                     generation_config=generation_config,
                     apply_timeout=True,
+                    metadata={
+                        "generation_name": "R2R: PDF page extraction",
+                        "r2r_page_number": page_num,
+                    },
                 )
 
                 if response.choices and response.choices[0].message:

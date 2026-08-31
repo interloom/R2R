@@ -30,6 +30,7 @@ from core.base.abstractions import (
     VectorTableName,
 )
 from core.base.api.models import User
+from core.utils.observability import r2r_observation_context
 from shared.abstractions import PDFParsingError, PopplerNotFoundError
 
 from ..abstractions import R2RProviders
@@ -316,22 +317,24 @@ class IngestionService:
                 },
             )
 
-            response = await self.providers.llm.aget_completion(
-                messages=messages,
-                generation_config=GenerationConfig(
-                    model=self.config.ingestion.document_summary_model
-                    or self.config.app.fast_llm
-                ),
-            )
+            with r2r_observation_context("R2R: Document summary"):
+                response = await self.providers.llm.aget_completion(
+                    messages=messages,
+                    generation_config=GenerationConfig(
+                        model=self.config.ingestion.document_summary_model
+                        or self.config.app.fast_llm
+                    ),
+                )
 
             document_info.summary = response.choices[0].message.content  # type: ignore
 
             if not document_info.summary:
                 raise ValueError("Expected a generated response.")
 
-            embedding = await self.providers.embedding.async_get_embedding(
-                text=document_info.summary,
-            )
+            with r2r_observation_context("R2R: Document summary embedding"):
+                embedding = await self.providers.embedding.async_get_embedding(
+                    text=document_info.summary,
+                )
             document_info.summary_embedding = embedding
         return
 
@@ -366,9 +369,16 @@ class IngestionService:
                 for ex in batch
             ]
             # Retrieve embeddings in bulk
-            vectors = await self.providers.embedding.async_get_embeddings(
-                texts,  # list of strings
-            )
+            with r2r_observation_context(
+                "R2R: Chunk embedding",
+                metadata={
+                    "r2r_chunk_count": len(batch),
+                    "r2r_chunk_ids": [str(chunk.id) for chunk in batch],
+                },
+            ):
+                vectors = await self.providers.embedding.async_get_embeddings(
+                    texts,  # list of strings
+                )
             # Zip them back together
             results = []
             for raw_vector, extraction in zip(vectors, batch, strict=False):
@@ -733,35 +743,45 @@ class IngestionService:
         ]
         try:
             # Obtain the updated text from the LLM
-            updated_chunk_text = (
-                (
-                    await self.providers.llm.aget_completion(
-                        messages=await self.providers.database.prompts_handler.get_message_payload(
-                            task_prompt_name=chunk_enrichment_settings.chunk_enrichment_prompt,
-                            task_inputs={
-                                "document_summary": document_summary or "None",
-                                "chunk": chunk["text"],
-                                "preceding_chunks": (
-                                    "\n".join(preceding_chunks)
-                                    if preceding_chunks
-                                    else "None"
-                                ),
-                                "succeeding_chunks": (
-                                    "\n".join(succeeding_chunks)
-                                    if succeeding_chunks
-                                    else "None"
-                                ),
-                                "chunk_size": self.config.ingestion.chunk_size
-                                or 1024,
-                            },
-                        ),
-                        generation_config=chunk_enrichment_settings.generation_config
-                        or GenerationConfig(model=self.config.app.fast_llm),
+            with r2r_observation_context(
+                "R2R: Chunk enrichment",
+                metadata={
+                    "r2r_chunk_id": str(chunk["id"]),
+                    "r2r_chunk_index": chunk_idx,
+                },
+            ):
+                updated_chunk_text = (
+                    (
+                        await self.providers.llm.aget_completion(
+                            messages=await self.providers.database.prompts_handler.get_message_payload(
+                                task_prompt_name=chunk_enrichment_settings.chunk_enrichment_prompt,
+                                task_inputs={
+                                    "document_summary": document_summary
+                                    or "None",
+                                    "chunk": chunk["text"],
+                                    "preceding_chunks": (
+                                        "\n".join(preceding_chunks)
+                                        if preceding_chunks
+                                        else "None"
+                                    ),
+                                    "succeeding_chunks": (
+                                        "\n".join(succeeding_chunks)
+                                        if succeeding_chunks
+                                        else "None"
+                                    ),
+                                    "chunk_size": self.config.ingestion.chunk_size
+                                    or 1024,
+                                },
+                            ),
+                            generation_config=chunk_enrichment_settings.generation_config
+                            or GenerationConfig(
+                                model=self.config.app.fast_llm
+                            ),
+                        )
                     )
+                    .choices[0]
+                    .message.content
                 )
-                .choices[0]
-                .message.content
-            )
         except Exception:
             updated_chunk_text = chunk["text"]
             chunk["metadata"]["chunk_enrichment_status"] = "failed"
@@ -775,9 +795,16 @@ class IngestionService:
             chunk["metadata"]["chunk_enrichment_status"] = "failed"
 
         # Re-embed
-        data = await self.providers.embedding.async_get_embedding(
-            updated_chunk_text
-        )
+        with r2r_observation_context(
+            "R2R: Enriched chunk embedding",
+            metadata={
+                "r2r_chunk_id": str(chunk["id"]),
+                "r2r_chunk_index": chunk_idx,
+            },
+        ):
+            data = await self.providers.embedding.async_get_embedding(
+                updated_chunk_text
+            )
         chunk["metadata"]["original_text"] = chunk["text"]
 
         return VectorEntry(

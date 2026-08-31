@@ -12,6 +12,7 @@ from core.base.providers import (
     DatabaseProvider,
     IngestionConfig,
 )
+from core.utils.observability import build_litellm_metadata
 
 logger = logging.getLogger()
 
@@ -52,12 +53,19 @@ class AudioParser(AsyncParser[bytes]):
                 temp_file_path = temp_file.name
 
             # Call Whisper transcription
-            response = await self.atranscription(
-                model=self.config.audio_transcription_model
-                or self.config.app.audio_lm,
-                file=open(temp_file_path, "rb"),
-                **kwargs,
+            metadata = build_litellm_metadata(
+                kwargs.pop("metadata", None),
+                default_trace_name="R2R: Audio transcription",
+                default_generation_name="R2R: Audio transcription",
             )
+            with open(temp_file_path, "rb") as audio_file:
+                response = await self.atranscription(
+                    model=self.config.audio_transcription_model
+                    or self.config.app.audio_lm,
+                    file=audio_file,
+                    metadata=metadata,
+                    **kwargs,
+                )
 
             # The response should contain the transcribed text directly
             yield response.text
