@@ -295,7 +295,8 @@ class RetrievalService(Service):
         ):
             query_vector = (
                 await self.providers.completion_embedding.async_get_embedding(
-                    text=query
+                    text=query,
+                    metadata={"trace_name": "r2r-search"},
                 )
             )
 

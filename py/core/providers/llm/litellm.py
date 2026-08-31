@@ -54,8 +54,8 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args["messages"] = messages
         args = {**args, **kwargs}
         args["metadata"] = {
-            **(args.get("metadata") or {}),
             "trace_name": "r2r",
+            **(args.get("metadata") or {}),
         }
 
         logger.debug(
@@ -73,8 +73,8 @@ class LiteLLMCompletionProvider(CompletionProvider):
         args["messages"] = messages
         args = {**args, **kwargs}
         args["metadata"] = {
-            **(args.get("metadata") or {}),
             "trace_name": "r2r",
+            **(args.get("metadata") or {}),
         }
 
         logger.debug(

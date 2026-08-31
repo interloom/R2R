@@ -75,8 +75,8 @@ class LiteLLMEmbeddingProvider(EmbeddingProvider):
             embedding_kwargs["api_key"] = self.config.api_key
         embedding_kwargs.update(kwargs)
         embedding_kwargs["metadata"] = {
-            **(embedding_kwargs.get("metadata") or {}),
             "trace_name": "r2r",
+            **(embedding_kwargs.get("metadata") or {}),
         }
         return embedding_kwargs
 

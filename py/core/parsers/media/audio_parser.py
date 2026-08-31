@@ -54,7 +54,7 @@ class AudioParser(AsyncParser[bytes]):
             # Call Whisper transcription
             metadata = {
                 **(kwargs.pop("metadata", None) or {}),
-                "trace_name": "r2r",
+                "trace_name": "r2r-indexing",
             }
             response = await self.atranscription(
                 model=self.config.audio_transcription_model
